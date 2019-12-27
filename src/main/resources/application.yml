@@ -1,0 +1,125 @@
+info:
+  name: '@project.artifactId@'
+  description: '@project.description@'
+  version: '@project.version@'
+  id: zpg
+  artifactId: '@project.artifactId@'
+  packaging: '@project.packaging@'
+  groupId: '@project.groupId@'
+spring:
+  profiles:
+    active:
+#    - default
+#    - ribbon
+    - eureka
+    - actuator
+    - ignore
+    - prefix
+    - filter
+
+---
+#   Scenario 1 without eureka,ribon
+spring:
+  profiles: default
+zuul:
+  routes:
+# you should call like below book-catalog replaces with http://localhost:9094 and append rest
+# http://localhost:8080/book-catalog/catalog/msdeo forward to http://localhost:9094/catalog/msdeo 
+    book-proxy:
+      url: http://localhost:9094
+# path: /book-catalog/** is not required but in url we have to use book-proxy like below
+# http://localhost:8080/book-proxy/catalog/msdeo 
+      path: /book-catalog/**
+      
+#   Scenario 2 with ribon and without eureka
+---
+spring:
+  profiles: ribbon
+zuul:
+  routes:
+# either this
+# we can use service-id in place of <routes> but path is required
+    book-catalog-service-ribbon:
+      path: /book-catalog/**
+      
+# or like below use any <routes> name with path and service-id
+#    book-proxy:
+#      path: /book-catalog/**
+#      service-id: book-catalog-service-ribbon
+      
+#  ReadTimeout is set otherwise default time out is 1 second and you might get time out exception
+ribbon:
+    ReadTimeout: 60000
+#  Setting the ribbon.eureka.enabled property to false explicitly disables the use of Eureka in Ribbon
+    eureka:
+      enabled: false
+      
+book-catalog-service-ribbon:
+  ribbon:
+    listOfServers: http://localhost:9094,http://localhost:9095
+---
+#   Scenario 3 with eureka
+spring:
+  profiles: eureka
+# no configurartion is required
+eureka:
+  client:
+    enabled: true # default true
+    registerWithEureka: true #you do not want your instances to be discovered whereas you just want do discover other instances.
+    fetchRegistry: true # Indicates whether this client should fetch eureka registry information from eureka server.
+    serviceUrl: #Map of availability zone to list of fully qualified URLs to communicate with eureka server
+      defaultZone : http://${eureka.instance.hostname}:8760/eureka/
+    
+
+# for "eureka.instance" related properties you can go through
+# https://github.com/spring-cloud/spring-cloud-netflix/blob/master/spring-cloud-netflix-eureka-client/src/main/java/org/springframework/cloud/netflix/eureka/EurekaInstanceConfigBean.java
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
+    preferIpAddress: true
+    leaseRenewalIntervalInSeconds: 3
+ribbon:
+    ReadTimeout: 60000
+---
+#   Scenario 4 with eureka with ignore
+spring:
+  profiles: ignore
+zuul:
+# Below one will block every url except if you mention below
+  ignoredServices: '*'
+  ignored-patterns:
+# It will block below url from zuul
+# http://localhost:8080/book-catalog/catalog/msdeo1
+  - /book-catalog/catalog/msdeo1
+  routes:
+    book-catalog-service-ribbon:
+      path: /book-catalog/**
+      
+# or like below use any <routes> name with path and service-id
+#    book-proxy:
+#      path: /book-catalog/**
+#      service-id: book-catalog-service-ribbon
+  
+ribbon:
+    ReadTimeout: 60000
+    
+---
+#   Scenario 5 with eureka with prefix
+spring:
+  profiles: prefix
+zuul:
+  prefix: /api
+  ignored-patterns:
+# It will block below url from zuul
+# http://localhost:8080/api/book-catalog/catalog/msdeo1
+  - /api/book-catalog/catalog/msdeo1
+  
+---
+spring:
+  profiles:
+   - filter
+#  to disable the filter use zuul.<FilterClassName>.<filterType>.disable=true
+zuul:
+  ProxyPreFilter:
+    pre: 
+      disable: true
